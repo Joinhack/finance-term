@@ -1,7 +1,7 @@
 use crossterm::event::{self, Event, MouseEvent, MouseEventKind};
 use crossterm::{cursor, execute, terminal};
 use std::{io, panic};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 fn setup_events() {
     let mut stdout = io::stdout();
@@ -32,8 +32,14 @@ fn main() {
     setup_events();
     loop {
         let key_timeout = Duration::from_millis(30);
+        let now = Instant::now();
         if event::poll(key_timeout).unwrap() {
-            
+            if let Event::Key(key) = event::read().unwrap() {
+                println!("{:?}", key);
+            }
+        }
+        if now.elapsed() >= key_timeout {
+            //println!("time out!");
         }
     }
     println!("Hello, world!");
