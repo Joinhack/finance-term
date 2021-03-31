@@ -3,7 +3,7 @@ use tui::layout::Rect;
 use tui::style::{Color, Style};
 use tui::symbols;
 use tui::text::Span;
-use tui::widgets::{Axis, Block, Chart, Dataset, GraphType, StatefulWidget, Widget};
+use tui::widgets::*;
 
 pub struct StockState {}
 pub struct StockWidget {}
