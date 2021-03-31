@@ -9,6 +9,7 @@ use tui::Terminal;
 
 mod app;
 mod draw;
+mod theme;
 mod widget;
 
 fn setup_events() {

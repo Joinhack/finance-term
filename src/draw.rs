@@ -5,6 +5,7 @@ use tui::widgets::{Block, Paragraph};
 use tui::{backend::Backend, Terminal};
 
 use crate::app::App;
+use crate::theme::style;
 use crate::widget::*;
 
 pub fn draw<B: Backend>(terminal: &mut Terminal<B>, app: &App) {
@@ -28,6 +29,3 @@ pub fn draw<B: Backend>(terminal: &mut Terminal<B>, app: &App) {
         .unwrap();
 }
 
-fn style() -> Style {
-    return Default::default();
-}
