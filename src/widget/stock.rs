@@ -1,8 +1,8 @@
 use tui::buffer::Buffer;
 use tui::layout::Rect;
-use tui::style::{Color, Style};
+use tui::style::{Color, Style, Modifier};
 use tui::symbols;
-use tui::text::Span;
+use tui::text::{Span, Spans};
 use tui::widgets::*;
 
 pub struct StockState {}
@@ -55,5 +55,6 @@ impl StatefulWidget for StockWidget {
                     ),
             )
             .render(area, buf);
+                    
     }
 }
