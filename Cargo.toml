@@ -10,3 +10,10 @@ edition = "2018"
 crossterm = "0.19"
 lazy_static = "1.4.0"
 tui = { version = "0.14", default-features = false, features = ["crossterm","serde"] }
+websocket-lite = {version = "0.5.0", features = ["ssl-native-tls"]}
+tokio = {version = "1.5", features = ["net", "rt"]}
+futures = "0.3"
+bytes = "1.0.1"
+serde = "1"
+serde_json = "1.0"
+flate2 = {version = "1.0"}

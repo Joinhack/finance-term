@@ -8,13 +8,14 @@ use tui::backend::CrosstermBackend;
 use tui::Terminal;
 
 mod app;
+mod data_source;
 mod draw;
 mod theme;
 mod widget;
 
 fn setup_events() {
     let mut stdout = io::stdout();
-    execute!(stdout, cursor::Hide);
+    execute!(stdout, cursor::Hide).unwrap();
     execute!(stdout, terminal::EnterAlternateScreen).unwrap();
     execute!(stdout, terminal::Clear(terminal::ClearType::All)).unwrap();
     terminal::enable_raw_mode().unwrap();
@@ -39,9 +40,11 @@ fn setup_panic() {
 fn main() {
     let backend = CrosstermBackend::new(io::stdout());
     let mut terminal = Terminal::new(backend).unwrap();
+
+    let mut ds = data_source::DataSource::new(String::from("wss://api.huobi.pro/ws"));
+    ds.run();
     setup_panic();
     setup_events();
-
     let mut app = app::App::new();
     loop {
         draw::draw(&mut terminal, &app);

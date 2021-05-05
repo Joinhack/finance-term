@@ -1,5 +1,5 @@
-use tui::style::{Color, Style};
 use lazy_static::lazy_static;
+use tui::style::{Color, Style};
 
 pub fn style() -> Style {
     Style::default().bg(THEME.background())
