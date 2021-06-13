@@ -1,11 +1,13 @@
 use futures::stream::StreamExt;
 use futures::SinkExt;
 
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 use serde_json;
 
 use std::io::Read;
-use std::thread;
+use std::collections::HashMap;
+use std::{thread, fmt};
+use std::cell::RefCell;
 
 use bytes::Bytes;
 use crossbeam_channel::Sender;
@@ -16,10 +18,35 @@ use websocket_lite::{Message, Opcode, Result};
 pub enum StockData {}
 
 #[derive(Debug)]
+struct StockChannel {
+    id: String,
+    ch: String,
+    status: String,
+}
+
+
 pub struct DataSource {
     source: String,
-    ping_times: u64,
-    is_sub: bool,
+    pong_time: u64,
+    id_seq: u64,
+}
+
+#[derive(Deserialize, Debug)]
+struct Subbed {
+    id: String,
+    status: String,
+    subbed: String,
+    ts: u64,
+}
+
+struct Context {
+    ch: HashMap<String, StockChannel>
+}
+
+impl Context {
+    fn is_pub(&self, ch: &str) -> bool {
+        self.ch.contains_key(ch)
+    }
 }
 
 enum SubStatus {
@@ -46,10 +73,11 @@ impl DataSource {
     pub fn new(source: String) -> DataSource {
         DataSource {
             source,
-            ping_times: 0,
-            is_sub: false,
+            pong_time: 0,
+            id_seq: 1,
         }
     }
+
 
     async fn process_ping(
         &mut self,
@@ -57,34 +85,52 @@ impl DataSource {
         ws_stream: &mut AsyncClient,
     ) {
         if let Some(num) = json.get("ping") {
-            if let serde_json::Value::Number(num) = num {
+            if let serde_json::Value::Number(ref num) = num {
                 let pong = Pong { pong: num };
                 let pong_rs = serde_json::to_string(&pong);
                 let pong_rs = Message::text(pong_rs.unwrap());
-                println!("{:?}", &pong_rs);
-                if !self.enable_sub() {
-                    self.ping_times += 1;
-                }
                 ws_stream.send(pong_rs).await;
+                self.pong_time = num.as_u64().unwrap();
             }
         }
+    }
+
+    async fn process_sub(
+        &mut self,
+        ctx: &mut Context,
+        json: serde_json::Value,
+    ) {
+        let subbed: Subbed = serde_json::from_value(json).unwrap();
+        ctx.ch.get_mut(&(subbed.subbed)).map(|val| {
+            val.status = subbed.status
+        });
     }
 
     async fn sub(&mut self, topic: &str, id: &str, ws_stream: &mut AsyncClient) {
         let sub_rs = serde_json::to_string(&Sub { sub: topic, id: id });
         let sub_rs = Message::text(sub_rs.unwrap());
-        println!("{:?}", &sub_rs);
-        ws_stream.send(sub_rs).await;
-        self.is_sub = true;
+        ws_stream.send(sub_rs).await.unwrap();
     }
+    
 
     #[inline]
-    fn enable_sub(&self) -> bool {
-        if self.ping_times >= 1 && self.is_sub == false {
+    fn is_pong(&self) -> bool {
+        if self.pong_time > 0 {
             true
         } else {
             false
         }
+    }
+
+    fn next_id_seq(&mut self) -> u64 {
+        self.id_seq += 1;
+        self.id_seq
+    }
+
+    fn register_ch<'a>(&mut self, ctx: &'a mut Context, ch: &str) ->  &'a mut StockChannel {
+        let id: String = format!("id{}", self.next_id_seq()).into();
+        ctx.ch.entry(ch.into())
+            .or_insert(StockChannel{id: id, ch: ch.into(), status: String::from("uninited")})
     }
 
     pub fn run(self, sender: Sender<StockData>) {
@@ -94,10 +140,14 @@ impl DataSource {
                 .enable_io()
                 .build()
                 .unwrap();
+            
             rt.block_on(async {
                 let builder = websocket_lite::ClientBuilder::new(&inner.source).unwrap();
                 let mut ws_stream = builder.async_connect().await.unwrap();
+                let ctx = RefCell::new(Context{ch: HashMap::new()});
                 loop {
+                    let will_pub = "market.ethusdt.kline.1min";
+                    let mut ctx_ref = ctx.borrow_mut();
                     let ws_msg: Option<Result<Message>> = ws_stream.next().await;
                     if ws_msg.is_none() {
                         return;
@@ -114,22 +164,30 @@ impl DataSource {
                         eprintln!("message gzip decode error, detail {}", e);
                         return;
                     }
-                    let sval = serde_json::from_str::<serde_json::Value>(&data);
-                    if let Err(e) = sval {
-                        eprintln!("parse json error, detail {}", e);
-                        return;
-                    }
+                    let sval = match serde_json::from_str::<serde_json::Value>(&data) {
+                        Err(e) => {
+                            eprintln!("parse json error, detail {}", e);
+                            return;
+                        },
+                        Ok(v) => v,
+                    };
                     println!("{:?}", sval);
-                    if let serde_json::Value::Object(json) = sval.unwrap() {
+                    if let serde_json::Value::Object(ref json) = sval {
                         if json.get("ping").is_some() {
-                            inner.process_ping(&json, &mut ws_stream).await;
+                            inner.process_ping(json, &mut ws_stream).await;
+                        }
+                        if json.get("subbed").is_some() {
+                            inner.process_sub(&mut ctx_ref, sval).await;
                         }
                     }
-                    if inner.enable_sub() {
+                    if inner.is_pong() && !&ctx_ref.is_pub(will_pub) {
+                        let rs = inner.register_ch(&mut ctx_ref, will_pub);
                         inner
-                            .sub("market.ethusdt.kline.1min", "id1", &mut ws_stream)
+                            .sub(&rs.ch, &rs.id, &mut ws_stream)
                             .await;
                     }
+                    
+                    
                 }
             });
         });
