@@ -5,28 +5,21 @@ use serde::Serialize;
 use serde_json;
 
 use std::io::Read;
-use std::sync::{Arc, Mutex};
 use std::thread;
 
+use bytes::Bytes;
+use crossbeam_channel::Sender;
+use flate2::read::GzDecoder;
 use tokio::runtime;
 use websocket_lite::{Message, Opcode, Result};
-use bytes::Bytes;
-use flate2::read::GzDecoder;
-use crossbeam_channel::Sender;
 
+pub enum StockData {}
 
-struct DataSourceInner {
+#[derive(Debug)]
+pub struct DataSource {
     source: String,
     ping_times: u64,
     is_sub: bool,
-}
-
-pub enum StockData {
-
-}
-
-pub struct DataSource {
-    inner: Arc<Mutex<DataSourceInner>>,
 }
 
 enum SubStatus {
@@ -49,9 +42,9 @@ struct Sub<'a> {
 type AsyncClient =
     websocket_lite::AsyncClient<Box<dyn websocket_lite::AsyncNetworkStream + Unpin + Send + Sync>>;
 
-impl DataSourceInner {
-    pub fn new(source: String) -> DataSourceInner {
-        DataSourceInner {
+impl DataSource {
+    pub fn new(source: String) -> DataSource {
+        DataSource {
             source,
             ping_times: 0,
             is_sub: false,
@@ -93,29 +86,16 @@ impl DataSourceInner {
             false
         }
     }
-}
 
-impl DataSource {
-    fn clone_soruce(&self) -> String {
-        let guard = (*self.inner).lock().unwrap();
-        (*guard).source.clone()
-    }
-
-    pub fn new(source: String) -> DataSource {
-        DataSource {
-            inner: Arc::new(Mutex::new(DataSourceInner::new(source))),
-        }
-    }
-    pub fn run(&mut self, sender: Sender<StockData>) {
-        let mut inner = self.inner.clone();
-        let source = self.clone_soruce();
+    pub fn run(self, sender: Sender<StockData>) {
+        let mut inner = self;
         thread::spawn(move || {
             let rt = runtime::Builder::new_current_thread()
                 .enable_io()
                 .build()
                 .unwrap();
             rt.block_on(async {
-                let builder = websocket_lite::ClientBuilder::new(&source).unwrap();
+                let builder = websocket_lite::ClientBuilder::new(&inner.source).unwrap();
                 let mut ws_stream = builder.async_connect().await.unwrap();
                 loop {
                     let ws_msg: Option<Result<Message>> = ws_stream.next().await;
@@ -140,14 +120,13 @@ impl DataSource {
                         return;
                     }
                     println!("{:?}", sval);
-                    let mut inner_guard = (*inner).lock().unwrap();
                     if let serde_json::Value::Object(json) = sval.unwrap() {
                         if json.get("ping").is_some() {
-                            (*inner_guard).process_ping(&json, &mut ws_stream).await;
+                            inner.process_ping(&json, &mut ws_stream).await;
                         }
                     }
-                    if (*inner_guard).enable_sub() {
-                        (*inner_guard)
+                    if inner.enable_sub() {
+                        inner
                             .sub("market.ethusdt.kline.1min", "id1", &mut ws_stream)
                             .await;
                     }

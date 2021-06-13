@@ -7,7 +7,7 @@ use std::{io, panic, thread};
 use tui::backend::CrosstermBackend;
 use tui::Terminal;
 
-use crossbeam_channel::{bounded, Sender, select};
+use crossbeam_channel::{bounded, select, Sender};
 
 mod app;
 mod data_source;
@@ -22,13 +22,11 @@ fn setup_events(sender: Sender<KeyEvent>) {
     execute!(stdout, terminal::Clear(terminal::ClearType::All)).unwrap();
     terminal::enable_raw_mode().unwrap();
 
-    thread::spawn(move || {
-        loop {
-            let key_timeout = Duration::from_millis(300);
-            if event::poll(key_timeout).unwrap() {
-                if let Event::Key(key) = event::read().unwrap() {
-                    sender.send(key).unwrap();
-                }
+    thread::spawn(move || loop {
+        let key_timeout = Duration::from_millis(300);
+        if event::poll(key_timeout).unwrap() {
+            if let Event::Key(key) = event::read().unwrap() {
+                sender.send(key).unwrap();
             }
         }
     });
