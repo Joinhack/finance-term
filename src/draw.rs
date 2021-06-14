@@ -14,7 +14,7 @@ pub fn draw<B: Backend>(terminal: &mut Terminal<B>, app: &App) {
     if current_size.width <= 10 || current_size.height <= 10 {
         return;
     }
-    let mut stock_state = StockState {};
+    let mut stock_state = StockState{};
     terminal
         .draw(|frame| {
             frame.render_widget(Block::default().style(style()), frame.size());
@@ -24,7 +24,7 @@ pub fn draw<B: Backend>(terminal: &mut Terminal<B>, app: &App) {
                     .alignment(Alignment::Center),
                 current_size,
             );
-            frame.render_stateful_widget(StockWidget {}, current_size, &mut stock_state);
+            frame.render_stateful_widget(StockWidget::new(app.data()), current_size, &mut stock_state);
         })
         .unwrap();
 }

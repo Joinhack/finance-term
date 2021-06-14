@@ -43,17 +43,39 @@ struct Subbed {
 
 #[derive(Deserialize, Debug)]
 pub struct TickInner {
-    amount: f32,
-    close: f32,
-    high: f32,
-    low: f32,
-    open: f32,
+    amount: f64,
+    close: f64,
+    high: f64,
+    low: f64,
+    open: f64,
+}
+
+impl TickInner {
+    #[inline]
+    pub fn get_amount(&self) -> f64 {
+        self.amount
+    }
+
+    
 }
 
 #[derive(Deserialize, Debug)]
 pub struct Tick {
     ch: String,
-    tick: TickInner
+    tick: TickInner,
+    ts: f64
+}
+
+impl Tick {
+    #[inline]
+    pub fn get_tick(&self) -> &TickInner {
+        &self.tick
+    }
+
+    #[inline]
+    pub fn get_ts(&self) -> f64 {
+        self.ts
+    }
 }
 
 struct Context {

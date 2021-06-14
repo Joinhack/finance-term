@@ -5,26 +5,32 @@ use tui::symbols;
 use tui::text::{Span, Spans};
 use tui::widgets::*;
 
-pub struct StockState {}
-pub struct StockWidget {}
+use slice_deque::SliceDeque;
 
-impl StatefulWidget for StockWidget {
+pub struct StockState {}
+pub struct StockWidget<'a> {
+    data: &'a SliceDeque<(f64, f64)>
+}
+
+impl<'a> StockWidget<'a> {
+    pub fn new(data: &'a SliceDeque<(f64, f64)>) -> Self {
+        StockWidget {
+            data
+        }
+    }
+}
+
+impl<'a> StatefulWidget for StockWidget<'a> {
     type State = StockState;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         let datasets = vec![
             Dataset::default()
-                .name("data1")
-                .marker(symbols::Marker::Dot)
-                .graph_type(GraphType::Scatter)
-                .style(Style::default().fg(Color::Cyan))
-                .data(&[(0.0, 5.0), (1.0, 6.0), (1.5, 6.434)]),
-            Dataset::default()
                 .name("data2")
                 .marker(symbols::Marker::Braille)
                 .graph_type(GraphType::Line)
                 .style(Style::default().fg(Color::Magenta))
-                .data(&[(4.0, 5.0), (5.0, 8.0), (7.66, 13.5)]),
+                .data(self.data.as_slice()),
         ];
         Chart::new(datasets)
             .block(Block::default().title("Chart"))

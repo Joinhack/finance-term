@@ -16,6 +16,8 @@ mod draw;
 mod theme;
 mod widget;
 
+use data_source as ds;
+
 fn setup_events(sender: Sender<KeyEvent>) {
     let mut stdout = io::stdout();
     execute!(stdout, cursor::Hide).unwrap();
@@ -54,7 +56,7 @@ fn main() {
     let mut terminal = Terminal::new(backend).unwrap();
     let (evt_s, evt_r) = bounded(1);
     let (msg_s, msg_r) = bounded(1);
-    let ds = data_source::DataSource::new(String::from("wss://api.huobi.pro/ws"));
+    let ds = ds::DataSource::new(String::from("wss://api.huobi.pro/ws"));
     ds.run(msg_s);
     setup_panic();
     setup_events(evt_s);
@@ -77,7 +79,13 @@ fn main() {
                         return;
                     },
                     Ok(msg) => {
-                        println!("{:?}", msg);
+                        match msg {
+                            ds::StockData::Tick(t) => {
+                                let tick_inner = t.get_tick();
+                                app.push_data(tick_inner.get_amount(), t.get_ts());
+                                draw::draw(&mut terminal, &app);
+                            }
+                        }
                     },
                 }
             },
