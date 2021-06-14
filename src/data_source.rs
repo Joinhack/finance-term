@@ -99,7 +99,7 @@ impl DataSource {
                 let pong = Pong { pong: num };
                 let pong_rs = serde_json::to_string(&pong);
                 let pong_rs = Message::text(pong_rs.unwrap());
-                ws_stream.send(pong_rs).await;
+                ws_stream.send(pong_rs).await.unwrap();
                 self.pong_time = num.as_u64().unwrap();
             }
         }
@@ -159,7 +159,7 @@ impl DataSource {
                     let builder = websocket_lite::ClientBuilder::new(&inner.source).unwrap();
                     let mut ws_stream = match builder.async_connect().await {
                         Err(e) => {
-                            error!("error connect");
+                            error!("error connect, {}", e);
                             thread::sleep(time::Duration::from_secs(2));
                             continue;
                         },

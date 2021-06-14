@@ -73,7 +73,7 @@ fn main() {
             recv(msg_r) -> msg => {
                 match msg {
                     Err(e) => {
-                        error!("websocket closed"); 
+                        error!("websocket closed, {}", e); 
                         return;
                     },
                     Ok(msg) => {
