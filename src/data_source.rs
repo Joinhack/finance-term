@@ -160,7 +160,7 @@ impl DataSource {
                     let mut ws_stream = match builder.async_connect().await {
                         Err(e) => {
                             error!("error connect, {}", e);
-                            thread::sleep(time::Duration::from_secs(2));
+                            thread::sleep(time::Duration::from_secs_f32(0.8));
                             continue;
                         },
                         Ok(w) => w,
