@@ -1,21 +1,23 @@
 use futures::stream::StreamExt;
 use futures::SinkExt;
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use serde_json;
 
-use std::io::Read;
-use std::collections::HashMap;
-use std::{thread, fmt};
 use std::cell::RefCell;
+use std::collections::HashMap;
+use std::io::Read;
+use std::thread;
 
-use bytes::Bytes;
 use crossbeam_channel::Sender;
 use flate2::read::GzDecoder;
 use tokio::runtime;
 use websocket_lite::{Message, Opcode, Result};
 
-pub enum StockData {}
+#[derive(Debug)]
+pub enum StockData {
+    Tick(Tick)
+}
 
 #[derive(Debug)]
 struct StockChannel {
@@ -24,14 +26,13 @@ struct StockChannel {
     status: String,
 }
 
-
 pub struct DataSource {
     source: String,
     pong_time: u64,
     id_seq: u64,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize)]
 struct Subbed {
     id: String,
     status: String,
@@ -39,20 +40,29 @@ struct Subbed {
     ts: u64,
 }
 
+#[derive(Deserialize, Debug)]
+pub struct TickInner {
+    amount: f32,
+    close: f32,
+    high: f32,
+    low: f32,
+    open: f32,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct Tick {
+    ch: String,
+    tick: TickInner
+}
+
 struct Context {
-    ch: HashMap<String, StockChannel>
+    ch: HashMap<String, StockChannel>,
 }
 
 impl Context {
     fn is_pub(&self, ch: &str) -> bool {
         self.ch.contains_key(ch)
     }
-}
-
-enum SubStatus {
-    Disable(u64),
-    Enable,
-    InSub,
 }
 
 #[derive(Serialize)]
@@ -78,7 +88,6 @@ impl DataSource {
         }
     }
 
-
     async fn process_ping(
         &mut self,
         json: &serde_json::Map<String, serde_json::Value>,
@@ -95,15 +104,16 @@ impl DataSource {
         }
     }
 
-    async fn process_sub(
-        &mut self,
-        ctx: &mut Context,
-        json: serde_json::Value,
-    ) {
+    fn process_sub(&mut self, ctx: &mut Context, json: serde_json::Value) {
         let subbed: Subbed = serde_json::from_value(json).unwrap();
-        ctx.ch.get_mut(&(subbed.subbed)).map(|val| {
-            val.status = subbed.status
-        });
+        ctx.ch
+            .get_mut(&(subbed.subbed))
+            .map(|val| val.status = subbed.status);
+    }
+
+    fn process_tick(&mut self, sender:& Sender<StockData>, json: serde_json::Value) {
+        let tick: Tick = serde_json::from_value(json).unwrap();
+        sender.send(StockData::Tick(tick)).unwrap();
     }
 
     async fn sub(&mut self, topic: &str, id: &str, ws_stream: &mut AsyncClient) {
@@ -111,7 +121,6 @@ impl DataSource {
         let sub_rs = Message::text(sub_rs.unwrap());
         ws_stream.send(sub_rs).await.unwrap();
     }
-    
 
     #[inline]
     fn is_pong(&self) -> bool {
@@ -127,10 +136,13 @@ impl DataSource {
         self.id_seq
     }
 
-    fn register_ch<'a>(&mut self, ctx: &'a mut Context, ch: &str) ->  &'a mut StockChannel {
+    fn register_ch<'a>(&mut self, ctx: &'a mut Context, ch: &str) -> &'a mut StockChannel {
         let id: String = format!("id{}", self.next_id_seq()).into();
-        ctx.ch.entry(ch.into())
-            .or_insert(StockChannel{id: id, ch: ch.into(), status: String::from("uninited")})
+        ctx.ch.entry(ch.into()).or_insert(StockChannel {
+            id: id,
+            ch: ch.into(),
+            status: String::from("uninited"),
+        })
     }
 
     pub fn run(self, sender: Sender<StockData>) {
@@ -140,24 +152,25 @@ impl DataSource {
                 .enable_io()
                 .build()
                 .unwrap();
-            
+
             rt.block_on(async {
                 let builder = websocket_lite::ClientBuilder::new(&inner.source).unwrap();
                 let mut ws_stream = builder.async_connect().await.unwrap();
-                let ctx = RefCell::new(Context{ch: HashMap::new()});
+                let ctx = RefCell::new(Context { ch: HashMap::new() });
                 loop {
                     let will_pub = "market.ethusdt.kline.1min";
                     let mut ctx_ref = ctx.borrow_mut();
                     let ws_msg: Option<Result<Message>> = ws_stream.next().await;
-                    if ws_msg.is_none() {
-                        return;
-                    }
-                    let ws_msg = ws_msg.unwrap();
-                    if let Err(e) = ws_msg {
-                        eprintln!("message recv error, detail:{}", e);
-                        return;
-                    }
-                    let msg = ws_msg.unwrap().into_data();
+                    let msg = match ws_msg {
+                        None => return,
+                        Some(ws_msg) => match ws_msg {
+                            Err(e) => {
+                                eprintln!("message recv error, detail:{}", e);
+                                return;
+                            }
+                            Ok(msg) => msg.into_data(),
+                        },
+                    };
                     let mut gz_data = GzDecoder::new(&msg[..]);
                     let mut data = String::new();
                     if let Err(e) = gz_data.read_to_string(&mut data) {
@@ -168,26 +181,22 @@ impl DataSource {
                         Err(e) => {
                             eprintln!("parse json error, detail {}", e);
                             return;
-                        },
+                        }
                         Ok(v) => v,
                     };
-                    println!("{:?}", sval);
                     if let serde_json::Value::Object(ref json) = sval {
                         if json.get("ping").is_some() {
                             inner.process_ping(json, &mut ws_stream).await;
-                        }
-                        if json.get("subbed").is_some() {
-                            inner.process_sub(&mut ctx_ref, sval).await;
+                        } else if json.get("subbed").is_some() {
+                            inner.process_sub(&mut ctx_ref, sval);
+                        } else if json.get("tick").is_some() {
+                            inner.process_tick(&sender, sval);
                         }
                     }
                     if inner.is_pong() && !&ctx_ref.is_pub(will_pub) {
                         let rs = inner.register_ch(&mut ctx_ref, will_pub);
-                        inner
-                            .sub(&rs.ch, &rs.id, &mut ws_stream)
-                            .await;
+                        inner.sub(&rs.ch, &rs.id, &mut ws_stream).await;
                     }
-                    
-                    
                 }
             });
         });

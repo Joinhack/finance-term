@@ -1,7 +1,7 @@
 use crossterm::event::{self, Event, KeyEvent, MouseEvent, MouseEventKind};
 use crossterm::{cursor, execute, terminal};
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use std::{io, panic, thread};
 
 use tui::backend::CrosstermBackend;
@@ -53,7 +53,7 @@ fn main() {
     let mut terminal = Terminal::new(backend).unwrap();
     let (evt_s, evt_r) = bounded(1);
     let (msg_s, msg_r) = bounded(1);
-    let mut ds = data_source::DataSource::new(String::from("wss://api.huobi.pro/ws"));
+    let ds = data_source::DataSource::new(String::from("wss://api.huobi.pro/ws"));
     ds.run(msg_s);
     setup_panic();
     setup_events(evt_s);
@@ -70,7 +70,15 @@ fn main() {
                 }
             },
             recv(msg_r) -> msg => {
+                match msg {
+                    Err(e) => {
+                        eprintln!("websocket closed"); 
+                        return;
+                    },
+                    Ok(msg) => {
 
+                    },
+                }
             },
         }
     }
