@@ -7,7 +7,7 @@ use serde_json;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::io::Read;
-use std::thread;
+use std::{thread, time};
 
 use crossbeam_channel::Sender;
 use flate2::read::GzDecoder;
@@ -154,48 +154,57 @@ impl DataSource {
                 .unwrap();
 
             rt.block_on(async {
-                let builder = websocket_lite::ClientBuilder::new(&inner.source).unwrap();
-                let mut ws_stream = builder.async_connect().await.unwrap();
-                let ctx = RefCell::new(Context { ch: HashMap::new() });
                 loop {
-                    let will_pub = "market.ethusdt.kline.1min";
-                    let mut ctx_ref = ctx.borrow_mut();
-                    let ws_msg: Option<Result<Message>> = ws_stream.next().await;
-                    let msg = match ws_msg {
-                        None => return,
-                        Some(ws_msg) => match ws_msg {
-                            Err(e) => {
-                                eprintln!("message recv error, detail:{}", e);
-                                return;
-                            }
-                            Ok(msg) => msg.into_data(),
-                        },
-                    };
-                    let mut gz_data = GzDecoder::new(&msg[..]);
-                    let mut data = String::new();
-                    if let Err(e) = gz_data.read_to_string(&mut data) {
-                        eprintln!("message gzip decode error, detail {}", e);
-                        return;
-                    }
-                    let sval = match serde_json::from_str::<serde_json::Value>(&data) {
+                    let builder = websocket_lite::ClientBuilder::new(&inner.source).unwrap();
+                    let mut ws_stream = match builder.async_connect().await {
                         Err(e) => {
-                            eprintln!("parse json error, detail {}", e);
-                            return;
-                        }
-                        Ok(v) => v,
+                            eprintln!("error connect");
+                            thread::sleep(time::Duration::from_secs(2));
+                            continue;
+                        },
+                        Ok(w) => w,
                     };
-                    if let serde_json::Value::Object(ref json) = sval {
-                        if json.get("ping").is_some() {
-                            inner.process_ping(json, &mut ws_stream).await;
-                        } else if json.get("subbed").is_some() {
-                            inner.process_sub(&mut ctx_ref, sval);
-                        } else if json.get("tick").is_some() {
-                            inner.process_tick(&sender, sval);
+                    let ctx = RefCell::new(Context { ch: HashMap::new() });
+                    'recv_loop: loop {
+                        let will_pub = "market.ethusdt.kline.1min";
+                        let mut ctx_ref = ctx.borrow_mut();
+                        let ws_msg: Option<Result<Message>> = ws_stream.next().await;
+                        let msg = match ws_msg {
+                            None => break 'recv_loop,
+                            Some(ws_msg) => match ws_msg {
+                                Err(e) => {
+                                    eprintln!("message recv error, detail:{}", e);
+                                    break 'recv_loop;
+                                }
+                                Ok(msg) => msg.into_data(),
+                            },
+                        };
+                        let mut gz_data = GzDecoder::new(&msg[..]);
+                        let mut data = String::new();
+                        if let Err(e) = gz_data.read_to_string(&mut data) {
+                            eprintln!("message gzip decode error, detail {}", e);
+                            break 'recv_loop;
                         }
-                    }
-                    if inner.is_pong() && !&ctx_ref.is_pub(will_pub) {
-                        let rs = inner.register_ch(&mut ctx_ref, will_pub);
-                        inner.sub(&rs.ch, &rs.id, &mut ws_stream).await;
+                        let sval = match serde_json::from_str::<serde_json::Value>(&data) {
+                            Err(e) => {
+                                eprintln!("parse json error, detail {}", e);
+                                break 'recv_loop;
+                            }
+                            Ok(v) => v,
+                        };
+                        if let serde_json::Value::Object(ref json) = sval {
+                            if json.get("ping").is_some() {
+                                inner.process_ping(json, &mut ws_stream).await;
+                            } else if json.get("subbed").is_some() {
+                                inner.process_sub(&mut ctx_ref, sval);
+                            } else if json.get("tick").is_some() {
+                                inner.process_tick(&sender, sval);
+                            }
+                        }
+                        if inner.is_pong() && !&ctx_ref.is_pub(will_pub) {
+                            let rs = inner.register_ch(&mut ctx_ref, will_pub);
+                            inner.sub(&rs.ch, &rs.id, &mut ws_stream).await;
+                        }
                     }
                 }
             });

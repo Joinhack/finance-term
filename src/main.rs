@@ -76,7 +76,7 @@ fn main() {
                         return;
                     },
                     Ok(msg) => {
-
+                        println!("{:?}", msg);
                     },
                 }
             },
