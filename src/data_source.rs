@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use std::io::Read;
 use std::{thread, time};
 
+use log::error;
 use crossbeam_channel::Sender;
 use flate2::read::GzDecoder;
 use tokio::runtime;
@@ -158,7 +159,7 @@ impl DataSource {
                     let builder = websocket_lite::ClientBuilder::new(&inner.source).unwrap();
                     let mut ws_stream = match builder.async_connect().await {
                         Err(e) => {
-                            eprintln!("error connect");
+                            error!("error connect");
                             thread::sleep(time::Duration::from_secs(2));
                             continue;
                         },
@@ -173,7 +174,7 @@ impl DataSource {
                             None => break 'recv_loop,
                             Some(ws_msg) => match ws_msg {
                                 Err(e) => {
-                                    eprintln!("message recv error, detail:{}", e);
+                                    error!("message recv error, detail:{}", e);
                                     break 'recv_loop;
                                 }
                                 Ok(msg) => msg.into_data(),
@@ -182,12 +183,12 @@ impl DataSource {
                         let mut gz_data = GzDecoder::new(&msg[..]);
                         let mut data = String::new();
                         if let Err(e) = gz_data.read_to_string(&mut data) {
-                            eprintln!("message gzip decode error, detail {}", e);
+                            error!("message gzip decode error, detail {}", e);
                             break 'recv_loop;
                         }
                         let sval = match serde_json::from_str::<serde_json::Value>(&data) {
                             Err(e) => {
-                                eprintln!("parse json error, detail {}", e);
+                                error!("parse json error, detail {}", e);
                                 break 'recv_loop;
                             }
                             Ok(v) => v,

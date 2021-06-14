@@ -7,6 +7,7 @@ use std::{io, panic, thread};
 use tui::backend::CrosstermBackend;
 use tui::Terminal;
 
+use log::error;
 use crossbeam_channel::{bounded, select, Sender};
 
 mod app;
@@ -72,7 +73,7 @@ fn main() {
             recv(msg_r) -> msg => {
                 match msg {
                     Err(e) => {
-                        eprintln!("websocket closed"); 
+                        error!("websocket closed"); 
                         return;
                     },
                     Ok(msg) => {
