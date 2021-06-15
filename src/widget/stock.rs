@@ -38,7 +38,7 @@ impl<'a> StatefulWidget for StockWidget<'a> {
                 Axis::default()
                     .title(Span::styled("X Axis", Style::default().fg(Color::Red)))
                     .style(Style::default().fg(Color::White))
-                    .bounds([0.0, 10.0])
+                    .bounds([0.0, 50.0])
                     .labels(
                         ["0.0", "5.0", "10.0"]
                             .iter()
@@ -51,7 +51,7 @@ impl<'a> StatefulWidget for StockWidget<'a> {
                 Axis::default()
                     .title(Span::styled("Y Axis", Style::default().fg(Color::Red)))
                     .style(Style::default().fg(Color::White))
-                    .bounds([0.0, 10.0])
+                    .bounds([0.0, 1623772246038.0])
                     .labels(
                         ["0.0", "5.0", "10.0"]
                             .iter()
