@@ -32,6 +32,7 @@ impl<'a> StatefulWidget for StockWidget<'a> {
                 .style(Style::default().fg(Color::Magenta))
                 .data(self.data.as_slice()),
         ];
+        println!("{:?}", self.data.as_slice());
         Chart::new(datasets)
             .block(Block::default().title("Chart"))
             .x_axis(
