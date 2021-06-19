@@ -44,7 +44,7 @@ impl StockState {
             .collect()
     }
 
-    pub fn calc_amount(&mut self, am: f64) {
+    pub fn calc_close(&mut self, am: f64) {
         if am + 20.0  > self.y_bounds.1  {
             self.y_bounds.1 = (am + 20.0);
         }
@@ -54,7 +54,7 @@ impl StockState {
                 self.y_bounds.0 = 0.0
             }
         } else if self.y_bounds.0 == 0.0 {
-            let low = am - 10.0;
+            let low = am - 20.0;
             self.y_bounds.0 = if low > 0.0 {
                 low
             } else {
@@ -70,11 +70,11 @@ impl StockState {
 
     pub fn add_tick(&mut self, tick: Tick) {
         let am = tick.get_close();
-        self.calc_amount(am);
+        self.calc_close(am);
         self.datas.push(tick);
         if self.datas.len() > 30 {
             if let Some(tick) = self.datas.pop() {
-                self.calc_amount(tick.get_close());
+                self.calc_close(tick.get_close());
             }
         }
     }
