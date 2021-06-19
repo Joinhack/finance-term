@@ -7,8 +7,8 @@ use std::{io, panic, thread};
 use tui::backend::CrosstermBackend;
 use tui::Terminal;
 
-use log::error;
 use crossbeam_channel::{bounded, select, Sender};
+use log::error;
 
 mod app;
 mod data_source;
@@ -61,7 +61,7 @@ fn main() {
     setup_panic();
     setup_events(evt_s);
     let mut app = app::App::new();
-    draw::draw(&mut terminal, &app);
+    draw::draw(&mut terminal, &mut app);
     loop {
         select! {
             recv(evt_r) -> msg => {
@@ -75,15 +75,15 @@ fn main() {
             recv(msg_r) -> msg => {
                 match msg {
                     Err(e) => {
-                        error!("websocket closed, {}", e); 
+                        error!("websocket closed, {}", e);
                         return;
                     },
                     Ok(msg) => {
                         match msg {
                             ds::StockData::Tick(t) => {
-                                let tick_inner = t.get_tick();
-                                app.push_data(tick_inner.get_amount(), t.get_ts());
-                                draw::draw(&mut terminal, &app);
+                                let tick = t.get_tick();
+                                app.stock_state.add_tick(t);
+                                draw::draw(&mut terminal, &mut app);
                             }
                         }
                     },

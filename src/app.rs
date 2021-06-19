@@ -1,20 +1,15 @@
-use slice_deque::SliceDeque;
+use chrono;
+
+use crate::widget::StockState;
 
 pub struct App {
-    data: SliceDeque<(f64, f64)>
+    pub stock_state: StockState,
 }
 
 impl App {
     pub fn new() -> App {
-        return App {data: SliceDeque::new()};
-    }
-
-    #[inline]
-    pub fn data(&self) -> &'_ SliceDeque<(f64, f64)> {
-        return &self.data;
-    }
-
-    pub fn push_data(&mut self, data: f64, t: f64) {
-        self.data.push_back((data, t));
+        return App {
+            stock_state: StockState::new(),
+        };
     }
 }

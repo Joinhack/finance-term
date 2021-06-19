@@ -9,15 +9,15 @@ use std::collections::HashMap;
 use std::io::Read;
 use std::{thread, time};
 
-use log::error;
 use crossbeam_channel::Sender;
 use flate2::read::GzDecoder;
+use log::error;
 use tokio::runtime;
 use websocket_lite::{Message, Opcode, Result};
 
 #[derive(Debug)]
 pub enum StockData {
-    Tick(Tick)
+    Tick(Tick),
 }
 
 #[derive(Debug)]
@@ -55,15 +55,13 @@ impl TickInner {
     pub fn get_amount(&self) -> f64 {
         self.amount
     }
-
-    
 }
 
 #[derive(Deserialize, Debug)]
 pub struct Tick {
     ch: String,
     tick: TickInner,
-    ts: f64
+    ts: u64,
 }
 
 impl Tick {
@@ -73,8 +71,13 @@ impl Tick {
     }
 
     #[inline]
-    pub fn get_ts(&self) -> f64 {
+    pub fn get_ts(&self) -> u64 {
         self.ts
+    }
+
+    #[inline]
+    pub fn get_amount(&self) -> f64 {
+        self.tick.amount
     }
 }
 
@@ -134,7 +137,7 @@ impl DataSource {
             .map(|val| val.status = subbed.status);
     }
 
-    fn process_tick(&mut self, sender:& Sender<StockData>, json: serde_json::Value) {
+    fn process_tick(&mut self, sender: &Sender<StockData>, json: serde_json::Value) {
         let tick: Tick = serde_json::from_value(json).unwrap();
         sender.send(StockData::Tick(tick)).unwrap();
     }
@@ -184,7 +187,7 @@ impl DataSource {
                             error!("error connect, {}", e);
                             thread::sleep(time::Duration::from_secs_f32(0.8));
                             continue;
-                        },
+                        }
                         Ok(w) => w,
                     };
                     let ctx = RefCell::new(Context { ch: HashMap::new() });
