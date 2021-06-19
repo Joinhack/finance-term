@@ -65,19 +65,20 @@ pub struct Tick {
 }
 
 impl Tick {
-    #[inline]
     pub fn get_tick(&self) -> &TickInner {
         &self.tick
     }
 
-    #[inline]
     pub fn get_ts(&self) -> u64 {
         self.ts
     }
 
-    #[inline]
     pub fn get_amount(&self) -> f64 {
         self.tick.amount
+    }
+
+    pub fn get_close(&self) -> f64 {
+        self.tick.close
     }
 }
 
