@@ -95,13 +95,13 @@ impl StatefulWidget for StockWidget {
             .block(Block::default().title("Chart"))
             .x_axis(
                 Axis::default()
-                    .title(Span::styled("X", Style::default().fg(Color::Red)))
+                    .title(Span::styled("Time", Style::default().fg(Color::Red)))
                     .style(Style::default().fg(Color::White))
                     .bounds([0.0, 30.0]),
             )
             .y_axis(
                 Axis::default()
-                    .title(Span::styled("Y", Style::default().fg(Color::Red)))
+                    .title(Span::styled("Money", Style::default().fg(Color::Red)))
                     .style(Style::default().fg(Color::White))
                     .bounds([state.y_bounds.0, state.y_bounds.1])
                     .labels(state.y_labels.iter().cloned().map(Span::from).collect()),
