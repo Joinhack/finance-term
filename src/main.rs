@@ -82,7 +82,7 @@ fn main() {
                         match msg {
                             ds::StockData::Tick(t) => {
                                 let tick = t.get_tick();
-                                app.stock_state.add_tick(t);
+                                app.stock_state.add_tick(&t);
                                 draw::draw(&mut terminal, &mut app);
                             }
                         }

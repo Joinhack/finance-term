@@ -5,15 +5,17 @@ use tui::symbols;
 use tui::text::{Span, Spans};
 use tui::widgets::*;
 
+use chrono::prelude::{Local, TimeZone, Timelike};
+
+use std::collections::{HashMap, LinkedList};
+
 use crate::data_source::Tick;
 
 #[derive(Debug)]
 pub struct StockState {
-    x_bounds: (f64, f64),
     y_bounds: (f64, f64),
-    x_labels: Vec<String>,
     y_labels: Vec<String>,
-    datas: Vec<Tick>,
+    datas: LinkedList<(u32, f64)>,
 }
 
 pub struct StockWidget {}
@@ -21,45 +23,24 @@ pub struct StockWidget {}
 impl StockState {
     pub fn new() -> StockState {
         StockState {
-            x_bounds: (0.0, 0.0),
             y_bounds: (0.0, 0.0),
-            x_labels: vec![],
             y_labels: vec![],
-            datas: vec![],
+            datas: Default::default(),
         }
-    }
-
-    pub fn get_mut_data(&mut self) -> &mut Vec<Tick> {
-        &mut self.datas
-    }
-
-    pub fn get_data(&self) -> &Vec<Tick> {
-        &self.datas
-    }
-
-    fn datas_vec(&self) -> Vec<(f64, f64)> {
-        self.datas
-            .iter()
-            .map(|ref p| (p.get_amount(), p.get_ts() as f64))
-            .collect()
     }
 
     pub fn calc_close(&mut self, am: f64) {
-        if am + 20.0  > self.y_bounds.1  {
-            self.y_bounds.1 = (am + 20.0);
+        if am + 20.0 > self.y_bounds.1 {
+            self.y_bounds.1 = am + 20.0;
         }
         if am < self.y_bounds.0 - 20.0 {
-            self.y_bounds.0 = (am - 20.0);
+            self.y_bounds.0 = am - 20.0;
             if self.y_bounds.0 < 0.0 {
                 self.y_bounds.0 = 0.0
             }
         } else if self.y_bounds.0 == 0.0 {
             let low = am - 20.0;
-            self.y_bounds.0 = if low > 0.0 {
-                low
-            } else {
-                am
-            };
+            self.y_bounds.0 = if low > 0.0 { low } else { am };
         }
         self.y_labels = vec![
             format!("{:.2}", self.y_bounds.0),
@@ -68,14 +49,23 @@ impl StockState {
         ];
     }
 
-    pub fn add_tick(&mut self, tick: Tick) {
+    pub fn add_tick(&mut self, tick: &Tick) {
         let am = tick.get_close();
         self.calc_close(am);
-        self.datas.push(tick);
-        if self.datas.len() > 30 {
-            if let Some(tick) = self.datas.pop() {
-                self.calc_close(tick.get_close());
+        let dt = Local.timestamp((tick.get_ts() / 1000) as i64, 0);
+        let minute = dt.minute();
+        let mut add_flag = true;
+        if let Some(last) = self.datas.back_mut() {
+            if last.0 == minute {
+                last.1 = tick.get_close();
+                add_flag = false;
             }
+        }
+        if add_flag {
+            self.datas.push_back((minute, tick.get_close()));
+        }
+        if self.datas.len() > 60 {
+            self.datas.pop_front();
         }
     }
 }
@@ -84,9 +74,19 @@ impl StatefulWidget for StockWidget {
     type State = StockState;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
-        let data_vec = state.datas_vec();
+        let title_label = Local::now().format("%H-%M").to_string();
+        let mut i = 0;
+
+        let data_vec = state
+            .datas
+            .iter()
+            .map(|x| {
+                let v = (i as f64, x.1);
+                i += 1;
+                v
+            })
+            .collect::<Vec<(f64, f64)>>();
         let datasets = vec![Dataset::default()
-            .name("data2")
             .marker(symbols::Marker::Braille)
             .graph_type(GraphType::Line)
             .style(Style::default().fg(Color::Magenta))
@@ -97,8 +97,7 @@ impl StatefulWidget for StockWidget {
                 Axis::default()
                     .title(Span::styled("X", Style::default().fg(Color::Red)))
                     .style(Style::default().fg(Color::White))
-                    .bounds([state.x_bounds.0, state.x_bounds.1])
-                    .labels(state.x_labels.iter().cloned().map(Span::from).collect()),
+                    .bounds([0.0, 30.0]),
             )
             .y_axis(
                 Axis::default()
