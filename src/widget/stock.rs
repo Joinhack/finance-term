@@ -50,8 +50,6 @@ impl StockState {
     }
 
     pub fn add_tick(&mut self, tick: &Tick) {
-        let am = tick.get_close();
-        self.calc_close(am);
         let dt = Local.timestamp((tick.get_ts() / 1000) as i64, 0);
         let minute = dt.minute();
         let mut add_flag = true;
@@ -64,8 +62,16 @@ impl StockState {
         if add_flag {
             self.datas.push_back((minute, tick.get_close()));
         }
+
         if self.datas.len() > 60 {
             self.datas.pop_front();
+            if let Some(x) = self.datas.front() {
+                self.calc_close(x.1);
+            }
+        }
+
+        if self.datas.len() == 1 {
+            self.calc_close(tick.get_close());
         }
     }
 }
