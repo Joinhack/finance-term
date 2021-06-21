@@ -13,7 +13,7 @@ use crossbeam_channel::Sender;
 use flate2::read::GzDecoder;
 use log::error;
 use tokio::runtime;
-use websocket_lite::{Message, Opcode, Result};
+use websocket_lite::{Message, Result};
 
 #[derive(Debug)]
 pub enum StockData {
@@ -51,10 +51,6 @@ pub struct TickInner {
 }
 
 impl TickInner {
-    #[inline]
-    pub fn get_amount(&self) -> f64 {
-        self.amount
-    }
 }
 
 #[derive(Deserialize, Debug)]
@@ -65,16 +61,9 @@ pub struct Tick {
 }
 
 impl Tick {
-    pub fn get_tick(&self) -> &TickInner {
-        &self.tick
-    }
 
     pub fn get_ts(&self) -> u64 {
         self.ts
-    }
-
-    pub fn get_amount(&self) -> f64 {
-        self.tick.amount
     }
 
     pub fn get_close(&self) -> f64 {

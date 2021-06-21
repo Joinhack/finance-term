@@ -1,4 +1,4 @@
-use crossterm::event::{self, Event, KeyEvent, MouseEvent, MouseEventKind};
+use crossterm::event::{self, Event, KeyEvent};
 use crossterm::{cursor, execute, terminal};
 
 use std::time::Duration;
@@ -81,8 +81,7 @@ fn main() {
                     Ok(msg) => {
                         match msg {
                             ds::StockData::Tick(t) => {
-                                let tick = t.get_tick();
-                                app.stock_state.add_tick(&t);
+                                app.stock_state.add_tick(t);
                                 draw::draw(&mut terminal, &mut app);
                             }
                         }

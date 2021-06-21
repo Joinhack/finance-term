@@ -7,6 +7,7 @@ pub fn style() -> Style {
 
 macro_rules! def_theme_struct_with_defaults {
     ($($name:ident => $color:expr),+) => {
+        #[derive(Copy, Clone)]
         pub struct Theme {
             $(
             $name: Option<Color>,
@@ -15,7 +16,8 @@ macro_rules! def_theme_struct_with_defaults {
 
         impl Theme {
             $(
-                fn $name(&self) -> Color {
+                #[inline]
+                pub fn $name(self) -> Color {
                     self.$name.unwrap_or($color)
                 }
             )+
@@ -49,5 +51,5 @@ def_theme_struct_with_defaults!(
 );
 
 lazy_static! {
-    static ref THEME: Theme = Default::default();
+    pub static ref THEME: Theme = Default::default();
 }

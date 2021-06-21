@@ -1,21 +1,22 @@
 use tui::buffer::Buffer;
 use tui::layout::Rect;
-use tui::style::{Color, Modifier, Style};
+use tui::style::{Color, Style};
 use tui::symbols;
-use tui::text::{Span, Spans};
+use tui::text::{Span};
 use tui::widgets::*;
 
 use chrono::prelude::{Local, TimeZone, Timelike};
 
-use std::collections::{HashMap, LinkedList};
+use std::collections::{LinkedList};
 
 use crate::data_source::Tick;
+use crate::theme::THEME;
 
 #[derive(Debug)]
 pub struct StockState {
     y_bounds: (f64, f64),
     y_labels: Vec<String>,
-    datas: LinkedList<(u32, f64)>,
+    datas: LinkedList<(u32, Tick)>,
 }
 
 pub struct StockWidget {}
@@ -49,29 +50,28 @@ impl StockState {
         ];
     }
 
-    pub fn add_tick(&mut self, tick: &Tick) {
+    pub fn add_tick(&mut self, tick: Tick) {
         let dt = Local.timestamp((tick.get_ts() / 1000) as i64, 0);
         let minute = dt.minute();
-        let mut add_flag = true;
+        let t_close = tick.get_close();
         if let Some(last) = self.datas.back_mut() {
             if last.0 == minute {
-                last.1 = tick.get_close();
-                add_flag = false;
+                last.1 = tick;
+            } else {
+                self.datas.push_back((minute, tick));
             }
-        }
-        if add_flag {
-            self.datas.push_back((minute, tick.get_close()));
+        } else {
+            self.datas.push_back((minute, tick));
         }
 
         if self.datas.len() > 60 {
             self.datas.pop_front();
             if let Some(x) = self.datas.front() {
-                self.calc_close(x.1);
+                let close = x.1.get_close();
+                self.calc_close(close);
             }
-        }
-
-        if self.datas.len() == 1 {
-            self.calc_close(tick.get_close());
+        } else if self.datas.len() == 1 {
+            self.calc_close(t_close);
         }
     }
 }
@@ -80,14 +80,20 @@ impl StatefulWidget for StockWidget {
     type State = StockState;
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
-        let title_label = Local::now().format("%H-%M").to_string();
+        let mut title_label = "".into();
+        if let Some(t) = state.datas.back() {
+            title_label = Local
+                .timestamp((t.1.get_ts()/1000) as i64, 0)
+                .format("%H-%M-%S")
+                .to_string();
+        }
         let mut i = 0;
-
         let data_vec = state
             .datas
             .iter()
             .map(|x| {
-                let v = (i as f64, x.1);
+                let x = &x.1;
+                let v = (i as f64, x.get_close());
                 i += 1;
                 v
             })
@@ -95,10 +101,10 @@ impl StatefulWidget for StockWidget {
         let datasets = vec![Dataset::default()
             .marker(symbols::Marker::Braille)
             .graph_type(GraphType::Line)
-            .style(Style::default().fg(Color::Magenta))
+            .style(Style::default().fg(THEME.highlight_unfocused()))
             .data(data_vec.as_slice())];
         Chart::new(datasets)
-            .block(Block::default().title("Chart"))
+            .block(Block::default().title(title_label))
             .x_axis(
                 Axis::default()
                     .title(Span::styled("Time", Style::default().fg(Color::Red)))
