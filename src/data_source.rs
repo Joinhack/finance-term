@@ -38,7 +38,6 @@ struct Subbed {
     id: String,
     status: String,
     subbed: String,
-    ts: u64,
 }
 
 #[derive(Deserialize, Debug)]
