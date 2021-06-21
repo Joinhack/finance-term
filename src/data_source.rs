@@ -49,8 +49,7 @@ pub struct TickInner {
     open: f64,
 }
 
-impl TickInner {
-}
+impl TickInner {}
 
 #[derive(Deserialize, Debug)]
 pub struct Tick {
@@ -60,7 +59,6 @@ pub struct Tick {
 }
 
 impl Tick {
-
     pub fn get_ts(&self) -> u64 {
         self.ts
     }

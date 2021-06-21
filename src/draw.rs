@@ -1,4 +1,4 @@
-use tui::layout::{Alignment};
+use tui::layout::Alignment;
 use tui::text::Text;
 use tui::widgets::{Block, Paragraph};
 use tui::{backend::Backend, Terminal};

@@ -2,12 +2,12 @@ use tui::buffer::Buffer;
 use tui::layout::Rect;
 use tui::style::{Color, Style};
 use tui::symbols;
-use tui::text::{Span};
+use tui::text::Span;
 use tui::widgets::*;
 
 use chrono::prelude::{Local, TimeZone, Timelike};
 
-use std::collections::{LinkedList};
+use std::collections::LinkedList;
 
 use crate::data_source::Tick;
 use crate::theme::THEME;
@@ -83,7 +83,7 @@ impl StatefulWidget for StockWidget {
         let mut title_label = "".into();
         if let Some(t) = state.datas.back() {
             title_label = Local
-                .timestamp((t.1.get_ts()/1000) as i64, 0)
+                .timestamp((t.1.get_ts() / 1000) as i64, 0)
                 .format("%H-%M-%S")
                 .to_string();
         }
